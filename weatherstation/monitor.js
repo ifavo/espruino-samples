@@ -85,7 +85,7 @@ function receiveNrfData() {
  */
 function handleNrfInput(data) {
   // append data to current status
-  deepMerge(status, data);
+  status = deepMerge(status, data);
 }
 
 
