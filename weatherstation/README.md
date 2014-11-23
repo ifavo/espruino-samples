@@ -1,4 +1,5 @@
-This weather station uses an TSL2561 to capture luminosity values and infrared spectrum.  
+The weather station uses an TSL2561 to capture luminosity values and infrared spectrum.  
 With an DHT22 it collects temperature and humidity.  
-  
-A CC3000 is used to provide access to the data via HTTP/JSON.
+The data is then published to another Espruino using an NRF24L01+.
+
+On the other end a NRF24L01+ receives the data and provides a simple HTTP/JSON output on a CC3000.

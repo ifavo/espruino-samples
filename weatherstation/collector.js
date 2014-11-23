@@ -16,13 +16,14 @@ var status = {
 var config = {
   tsl2561: {sda:B9, scl:B8},
   dht22: C12,
-  cc3000: {
-    spi: (function () { SPI1.setup({sck: B3, miso: B4, mosi: B5, baud:1000000, mode: 1}); return SPI1; })() ,
-    cs: C1,
-    en: C2,
-    irq: C3,
-    accessPoint: "",
-    accessPassword: ""
+  nrf: {
+    spi: (function () { SPI1.setup({sck:A5, miso:A6, mosi:A7}); return SPI1; })() ,
+    ce: B0,
+    csn: B1,
+    network: {
+      local: [0,0,0,0,1],
+      remote: [0,0,0,0,2]
+    }
   },
   interval: 30*1000
 };
@@ -40,7 +41,6 @@ var dht;
  */
 function readTemperature () {
   dht.read(updateTemperature);
-  status.lastUpdate = getTime();
 }
 
 /**
@@ -50,7 +50,6 @@ function readTemperature () {
 function updateTemperature(data) {
   status.temperature = data.temp;
   status.humidity = data.rh;
-  status.lastUpdate = getTime();
 }
 
 
@@ -108,7 +107,6 @@ function readLight() {
  */
 function updateLightInfrared (value) {
   status.infrared[tsl.gain] = value;
-  status.lastUpdate = getTime();
 }
 
 /**
@@ -117,61 +115,32 @@ function updateLightInfrared (value) {
  */
 function updateLightVisible (value) {
   status.luminosity[tsl.gain] = value;
+  publishStatus();
+}
+
+
+
+
+
+var nrf;
+
+
+/**
+ * init the nrf network
+ */
+function initNrf() {
+  nrf = require("NRF24L01P").connect(config.nrf.spi, config.nrf.ce, config.nrf.csn );
+  nrf.init(config.nrf.network.local, config.nrf.network.remote);
+  publishStatus();
+}
+
+/**
+ * publish system status to another node
+ */
+function publishStatus () {
   status.lastUpdate = getTime();
+  nrf.sendString(JSON.stringify(status));
 }
-
-
-
-
-
-var wlan;
-
-
-/**
- * handle wlan status updates
- * @param {String} res
- */
-function wlanStatusUpdate (res) {
-  console.log(res);
-
-  switch (res) {
-    case "dhcp":
-      status.wlan = wlan.getIP();
-
-      // start http server
-      LED3.write(1);
-      require("http").createServer(onPageRequest).listen(80);
-      setTimeout("LED3.write(0);", 5000);
-      break;
-
-    case "disconnect":
-      setTimeout(connectWlan, 5000);
-      break;
-  }
-}
-
-
-/**
- * trigger wlan connection
- */
-var reconnectWlanInterval;
-function connectWlan() {
-  wlan = require("CC3000").connect(config.cc3000.spi, config.cc3000.cs, config.cc3000.en, config.cc3000.irq);
-  wlan.connect(config.cc3000.accessPoint, config.cc3000.accessPassword, wlanStatusUpdate);
-}
-
-
-/**
- * HTTP Request handler
- * @param {Object} req
- * @param {Object} res
- */
-function onPageRequest(req, res) { 
-  res.writeHead(200, {"Content-Type": "application/json"});
-  res.end(JSON.stringify(status));
-}
-
-
 
 
 
@@ -191,7 +160,13 @@ function updateSensors() {
 /**
  * init everything when system is ready
  */
+var hasInit = false;
 function onInit () {
+  if ( hasInit ) {
+    return;
+  }
+  hasInit = true;
+
   // Setup DHT22
   dht = require("DHT22").connect(config.dht22);
 
@@ -210,10 +185,13 @@ function onInit () {
   LED2.write(1);
   setTimeout("LED2.write(0);", 5000);
 
-  // WiFi Setup
-  connectWlan();
+  // networking Setup
+  initNrf();
 }
 
 
 // display init status with an LED
 LED1.write(1);
+
+
+setTimeout(onInit, 10000);
