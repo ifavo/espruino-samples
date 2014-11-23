@@ -21,7 +21,7 @@ var config = {
     }
   },
   cc3000: {
-    sid: "fao",
+    sid: "",
     password: "",
     spi: (function () { SPI3.setup({sck:B3, miso:B4, mosi:B5, baud:1000000, mode: 1}); return SPI3; })() ,
     cs: C6,
