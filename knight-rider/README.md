@@ -1,0 +1,2 @@
+extend espruino by connecting a shift registers on three pins (MISO, SCK, STORAGE REGISTER)  
+e.g. a 74HC595 can provide seven new pin's which is shown in this example where 7 LEDs are assumed to be on each pin
