@@ -59,7 +59,9 @@ function receiveNrfData() {
 
       for (var i in data) {
         var ch = data[i];
-        if (ch===0 && dataLine!=="") {
+        if ((ch===0 || ch===4) && dataLine!=="") {
+
+          status.lastNrfLine = dataLine;
 
           // remove noise in the beginning of the line
           if ( dataLine.indexOf('{') > 0 ) {
@@ -87,7 +89,7 @@ function receiveNrfData() {
           }
 
           dataLine = "";
-        } else if (ch!==0) {
+        } else if (ch!==0 && ch!==4 && ch >= 32) { // 0 = NULL, 4 = EOT, <32 = all command codes
           dataLine += String.fromCharCode(ch);
         }
       }
