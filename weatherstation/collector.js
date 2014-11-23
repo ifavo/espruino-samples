@@ -51,8 +51,8 @@ function readTemperature () {
 function updateTemperature(data) {
   status.tmp = data.temp;
   status.hum = data.rh;
-  publishStatus("tmp");
   publishStatus("hum");
+  publishStatus("tmp");
 }
 
 
@@ -133,8 +133,6 @@ var nrf;
  * init the nrf network
  */
 function initNrf() {
-  nrf = require("NRF24L01P").connect(config.nrf.spi, config.nrf.ce, config.nrf.csn );
-  nrf.init(config.nrf.network.local, config.nrf.network.remote);
   publishStatus();
 }
 
@@ -144,6 +142,8 @@ function initNrf() {
  */
 function publishStatus (part) {
   status.lastUpdate = getTime();
+  nrf = require("NRF24L01P").connect(config.nrf.spi, config.nrf.ce, config.nrf.csn );
+  nrf.init(config.nrf.network.local, config.nrf.network.remote);
   if ( part ) {
     nrf.sendString("{\"" + part + "\":" + JSON.stringify(status[part]) + "}");
   }
