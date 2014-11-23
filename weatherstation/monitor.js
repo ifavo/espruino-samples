@@ -28,7 +28,7 @@ var config = {
     en: C7,
     irq: C8
   },
-  log: "log.txt"
+  log: "log-%day.txt"
 
 };
 
@@ -60,8 +60,25 @@ function receiveNrfData() {
       for (var i in data) {
         var ch = data[i];
         if (ch===0 && dataLine!=="") {
+
+          // remove noise in the beginning of the line
+          if ( dataLine.indexOf('{') > 0 ) {
+            dataLine = dataLine.substr(dataLine.indexOf('{'));
+          }
+
+          // remove noise at the end of the line
+          if ( (dataLine.lastIndexOf('}')+1) != dataLine.length ) {
+            dataLine = dataLine.substr(0, dataLine.lastIndexOf('}') + 1);
+          }
+
           if ( dataLine.substr(0,1) == "{" && dataLine.substr(-1) == "}" ) {
+            status.lastNrfPacket = dataLine;
             try {
+              // replace -1 values because JSON.parse fails on them
+              // https://github.com/espruino/Espruino/issues/456
+              while ( dataLine.indexOf(":-1") >= 0 ) {
+                dataLine = dataLine.replace(':-1', ':\"-1\"');
+              }
               handleNrfInput(JSON.parse(dataLine));
             }
             catch (e) {
@@ -84,8 +101,14 @@ function receiveNrfData() {
  * @param {Object} data
  */
 function handleNrfInput(data) {
+  // ignore empty/invalid values
+  if ( !data ) {
+    return;
+  }
   // append data to current status
-  status = deepMerge(status, data);
+  status.data = deepMerge(status.data, data);
+  status.lastUpdate = getTime();
+  require('fs').appendFile(config.log.replace('%day', Math.ceil(getTime() / 86400)), JSON.stringify(status) + "\n");
 }
 
 
