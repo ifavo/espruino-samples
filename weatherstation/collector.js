@@ -3,10 +3,10 @@
  * status object will contain the latest data
  */
 var status = {
-  infrared: {},
-  luminosity: {},
-  temperature: 0,
-  humidity: 0,
+  ir: {},
+  lum: {},
+  tmp: 0,
+  hum: 0,
   lastUpdate: 0
 };
 
@@ -25,7 +25,8 @@ var config = {
       remote: [0,0,0,0,2]
     }
   },
-  interval: 30*1000
+  interval: 30*1000,
+  log: 'log-%day.txt'
 };
 
 
@@ -48,8 +49,10 @@ function readTemperature () {
  * @param {Object} data
  */
 function updateTemperature(data) {
-  status.temperature = data.temp;
-  status.humidity = data.rh;
+  status.tmp = data.temp;
+  status.hum = data.rh;
+  publishStatus("tmp");
+  publishStatus("hum");
 }
 
 
@@ -106,7 +109,8 @@ function readLight() {
  * @param {Number} value
  */
 function updateLightInfrared (value) {
-  status.infrared[tsl.gain] = value;
+  status.ir[tsl.gain] = Math.floor(value);
+  publishStatus("ir");
 }
 
 /**
@@ -114,8 +118,8 @@ function updateLightInfrared (value) {
  * @param {Number} value
  */
 function updateLightVisible (value) {
-  status.luminosity[tsl.gain] = value;
-  publishStatus();
+  status.lum[tsl.gain] = Math.floor(value);
+  publishStatus("lum");
 }
 
 
@@ -136,10 +140,17 @@ function initNrf() {
 
 /**
  * publish system status to another node
+ * @param {String} part optionally publish only this part of the data
  */
-function publishStatus () {
+function publishStatus (part) {
   status.lastUpdate = getTime();
-  nrf.sendString(JSON.stringify(status));
+  if ( part ) {
+    nrf.sendString("{\"" + part + "\":" + JSON.stringify(status[part]) + "}");
+  }
+  else {
+    nrf.sendString(JSON.stringify(status));
+  }
+  require('fs').appendFile(config.log.replace(Math.ceil(getTime()/86400)), JSON.stringify(status) + "\n");
 }
 
 
@@ -152,6 +163,7 @@ function updateSensors() {
   var func = intervalFunc.shift();
   intervalFunc.push(func);
   func();
+  setTimeout(updateSensors, config.interval);
 }
 
 
@@ -178,7 +190,7 @@ function onInit () {
   // setup the update intervals
   intervalFunc.push(readLight);
   intervalFunc.push(readTemperature);
-  setInterval(updateSensors, config.interval);
+  setTimeout(updateSensors, 10000);
 
   // turn off the status LED
   LED1.write(0);
