@@ -17,6 +17,10 @@ on-board leds as traffic light and overwrite-button to enforce a light mode
 
 Light, Temperature and Humidity data collection.
 
+**knight rider**
+
+example use of shift registers connected to the espruino with a "walking" led light
+
 **Modules**
 
 In some scripts custom modules might be referenced which can be found at:  
