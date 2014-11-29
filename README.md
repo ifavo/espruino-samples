@@ -21,6 +21,10 @@ Light, Temperature and Humidity data collection.
 
 example use of shift registers connected to the espruino with a "walking" led light
 
+**nrf-repeater**
+
+forward signals between NRF24L01+ nodes
+
 **Modules**
 
 In some scripts custom modules might be referenced which can be found at:  
