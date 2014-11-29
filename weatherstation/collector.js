@@ -14,6 +14,7 @@ var status = {
  * configuration of the components and intervals
  */
 var config = {
+  power: A0, // an analog power pin is used to switch sensor powers off and on again for full resets
   tsl2561: {sda:B9, scl:B8},
   dht22: C12,
   nrf: {
@@ -41,7 +42,10 @@ var dht;
  * interval for triggering temperatur readings
  */
 function readTemperature () {
-  dht.read(updateTemperature);
+  config.power.write(1);
+  setTimeout(function () {
+    dht.read(updateTemperature);
+  }, 500);
 }
 
 /**
@@ -49,10 +53,15 @@ function readTemperature () {
  * @param {Object} data
  */
 function updateTemperature(data) {
+  // failed to read data
+  if ( data.temp == -1 && data.rh ) {
+    return;
+  }
   status.tmp = data.temp;
   status.hum = data.rh;
-  publishStatus("hum");
-  publishStatus("tmp");
+  publishStatus('hum');
+  publishStatus('tmp');
+  config.power.write(0);
 }
 
 
@@ -75,33 +84,47 @@ var lightSwitch = -1;
 function readLight() {
   lightSwitch++;
 
-  switch (lightSwitch) {
+  // Setup luminosity sensor
+  config.power.write(1);
 
-    // visible spectrum at 1x gain
-    case 0:
-      tsl.setGain(tsl.C._1X);
-      tsl.getLuminosity(tsl.C.VISIBLE, updateLightVisible);
-      break;
+  setTimeout(function () {
 
-    // visible spectrum at 16x gain
-    case 1:
-      tsl.setGain(tsl.C._16X);
-      tsl.getLuminosity(tsl.C.VISIBLE, updateLightVisible);
-      break;
 
-    // visible spectrum at 16x gain
-    case 2:
-      tsl.setGain(tsl.C._16X);
-      tsl.getLuminosity(tsl.C.INFRARED, updateLightInfrared);
-      break;
+      // init tsl
+    I2C1.setup(config.tsl2561);
+    tsl = require('TSL2561').connect(I2C1);
+    tsl.init(tsl.C.FLOAT, tsl.C._101MS, tsl.C._1X);
+    tsl.enable();
 
-      // infrared spectrum at 1x gain
-    case 3:
-      tsl.setGain(tsl.C._1X);
-      tsl.getLuminosity(tsl.C.INFRARED, updateLightInfrared);
-      lightSwitch = -1;
-      break;
-  }
+    switch (lightSwitch) {
+
+      // visible spectrum at 1x gain
+      case 0:
+        tsl.setGain(tsl.C._1X);
+        tsl.getLuminosity(tsl.C.VISIBLE, updateLightVisible);
+        break;
+
+      // visible spectrum at 16x gain
+      case 1:
+        tsl.setGain(tsl.C._16X);
+        tsl.getLuminosity(tsl.C.VISIBLE, updateLightVisible);
+        break;
+
+      // visible spectrum at 16x gain
+      case 2:
+        tsl.setGain(tsl.C._16X);
+        tsl.getLuminosity(tsl.C.INFRARED, updateLightInfrared);
+        break;
+
+        // infrared spectrum at 1x gain
+      case 3:
+        tsl.setGain(tsl.C._1X);
+        tsl.getLuminosity(tsl.C.INFRARED, updateLightInfrared);
+        lightSwitch = -1;
+        break;
+    }
+  }, 500);
+
 }
 
 /**
@@ -109,8 +132,13 @@ function readLight() {
  * @param {Number} value
  */
 function updateLightInfrared (value) {
-  status.ir[tsl.gain] = Math.floor(value);
-  publishStatus("ir");
+  tsl.disable();
+  config.power.write(0);
+  value = Math.floor(value);
+  if ( value != 'NaN' ) {
+    status.ir[tsl.gain] = value;
+    publishStatus('ir');
+  }
 }
 
 /**
@@ -118,8 +146,13 @@ function updateLightInfrared (value) {
  * @param {Number} value
  */
 function updateLightVisible (value) {
-  status.lum[tsl.gain] = Math.floor(value);
-  publishStatus("lum");
+  tsl.disable();
+  config.power.write(0);
+  value = Math.floor(value);
+  if ( value != 'NaN' ) {
+    status.lum[tsl.gain] = value;
+    publishStatus('lum');
+  }
 }
 
 
@@ -133,6 +166,9 @@ var nrf;
  * init the nrf network
  */
 function initNrf() {
+  nrf = require("NRF24L01P").connect(config.nrf.spi, config.nrf.ce, config.nrf.csn );
+  nrf.init(config.nrf.network.local, config.nrf.network.remote);
+  nrf.setTXPower(3);
   publishStatus();
 }
 
@@ -140,16 +176,29 @@ function initNrf() {
  * publish system status to another node
  * @param {String} part optionally publish only this part of the data
  */
+var sendingLimit = 0;
 function publishStatus (part) {
-  status.lastUpdate = getTime();
-  nrf = require("NRF24L01P").connect(config.nrf.spi, config.nrf.ce, config.nrf.csn );
-  nrf.init(config.nrf.network.local, config.nrf.network.remote);
+  status.lastUpdate = Math.ceil(getTime());
+  nrf.setEnabled(true);
+  var i = 3;
+  var sendString;
   if ( part ) {
-    nrf.sendString("{\"" + part + "\":" + JSON.stringify(status[part]) + "}");
+    sendString = "{\"" + part + "\":" + JSON.stringify(status[part]) + "}";
+    sendLimit = 3;
   }
   else {
-    nrf.sendString(JSON.stringify(status));
+    sendString = JSON.stringify(status);
   }
+
+  sendingLimit--;
+  if ( !nrf.sendString(sendString) && sendingLimit > 0 ) {
+    setTimeout("publishStatus();", 1000);
+  }
+  else {
+    sendingLimit = 0;
+  }
+
+  nrf.setEnabled(false);
   require('fs').appendFile(config.log.replace(Math.ceil(getTime()/86400)), JSON.stringify(status) + "\n");
 }
 
@@ -160,9 +209,15 @@ var intervalFunc = [];
  * trigger an update for each sensor
  */
 function updateSensors() {
+  // clear all watches to prevent stacking watches within some modules
+  clearWatch();
+
+  // call sensor reading
   var func = intervalFunc.shift();
   intervalFunc.push(func);
   func();
+
+  // setup the next interval
   setTimeout(updateSensors, config.interval);
 }
 
@@ -179,13 +234,8 @@ function onInit () {
   }
   hasInit = true;
 
-  // Setup DHT22
+  // init DHT
   dht = require("DHT22").connect(config.dht22);
-
-  // Setup luminosity sensor
-  I2C1.setup(config.tsl2561);
-  tsl = require('TSL2561').connect(I2C1);
-  tsl.init(tsl.C.FLOAT, tsl.C._101MS, tsl.C._1X);
 
   // setup the update intervals
   intervalFunc.push(readLight);
@@ -197,8 +247,10 @@ function onInit () {
   LED2.write(1);
   setTimeout("LED2.write(0);", 5000);
 
+
   // networking Setup
   initNrf();
+
 }
 
 
