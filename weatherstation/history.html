@@ -30,11 +30,12 @@
 	var historyLen = 0;
 	var historyData = [];
 	var historyId = 0;
+	var historyMaxData = 1000;
 
 	$.getJSON("/history/len", function (res) {
 		if ( res ) {
 			historyLen = res.len;
-			historyId = (historyLen > 30) ? historyLen - 30 : 0;
+			historyId = (historyLen > historyMaxData) ? historyLen - historyMaxData : 0;
 			fetchHistory();
 		}
 	});
