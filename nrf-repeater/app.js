@@ -24,6 +24,7 @@ var nrf;
 function initNrf() {
   nrf = require("NRF24L01P").connect(config.nrf.spi, config.nrf.ce, config.nrf.csn );
   nrf.init(config.nrf.network.local, config.nrf.network.remote);
+  nrf.setTXPower(3);
   receiveNrfData();
 }
 
@@ -44,9 +45,11 @@ function receiveNrfData() {
         if ((ch===0 || ch===4) && dataLine!=="") {
 
           // forward data to another node
+          LED3.write(1);
           nrf.setTXAddr(config.nrf.network.forward);
           nrf.sendString(dataLine);
           nrf.setTXAddr(config.nrf.network.remote);
+          setTimeout("LED3.write(0);", 500);
 
           dataLine = "";
         } else if (ch!==0 && ch!==4 && ch >= 32) { // 0 = NULL, 4 = EOT, <32 = all command codes
