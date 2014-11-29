@@ -30,7 +30,8 @@ var config = {
   },
   history: {
     db: require('org.favo.db').connect('history.db'),
-    max: 1000
+    max: 1000,
+    interval: 5*60*1000
   }
 
 };
@@ -120,16 +121,6 @@ function handleNrfInput(data) {
   // append data to current status
   status.data = deepMerge(status.data, data);
   status.lastUpdate = getTime();
-
-  // log to history
-  if ( config.history && config.history.db ) {
-    config.history.db.add(status.data);
-
-    // remove oldest/first entry if max. count is reached
-    if ( config.history.db.len() > config.history.max ) {
-      config.history.db.rem(1);
-    }
-  }
 }
 
 
@@ -241,6 +232,21 @@ function getMime(file) {
 
 
 /**
+ * history logger
+ */
+function historyLog() {
+
+  config.history.db.add(status.data);
+
+  // remove oldest/first entry if max. count is reached
+  if ( config.history.db.len() > config.history.max ) {
+    config.history.db.rem(1);
+  }
+
+}
+
+
+/**
  * init functionality and intervals when device is ready
  */
 var hasInit = false;
@@ -255,6 +261,11 @@ function onInit () {
 
   // nrf reading
   initNrf();
+
+  // log data every n-minutes
+  if ( config.history && config.history.db ) {
+    setInterval(historyLog, config.history.interval);
+  }
 
   // display ready status by led
   LED1.write(0);
