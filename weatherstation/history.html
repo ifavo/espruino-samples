@@ -1,0 +1,132 @@
+<!DOCTYPE>
+<html>
+ <meta name="viewport" content="width=device-width, initial-scale=1">
+ <body>
+  <div class="container-fluid">
+   <div class="row">
+    <div class="col-md-2"></div>
+    <div class="col-md-2"><a href="/json" class="btn btn-default">JSON</a></div>
+    <div class="col-md-2"><a href="/" class="btn btn-primary">Overview</a></div>
+   </div>
+   <div class="row">
+    <b>Temperature</b>
+    <div class="col-md-12"><canvas id="chart1" width="800" height="400"></canvas></div>
+   </div>
+   <div class="row">
+    <b>Humidity (%)</b>
+    <div class="col-md-12"><canvas id="chart2" width="800" height="400"></canvas></div>
+   </div>
+   <div class="row">
+    <b>Brightness (Lux)</b>
+    <div class="col-md-12"><canvas id="chart3" width="800" height="400"></canvas></div>
+   </div>
+  </div>
+
+  <link href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap.min.css" rel="stylesheet">
+  <script src="//code.jquery.com/jquery-2.1.1.min.js"></script>
+  <script src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.1/js/bootstrap.min.js"></script>
+  <script src="//cdn.bootcss.com/Chart.js/0.2.0/Chart.js"></script>
+  <script>
+	var historyLen = 0;
+	var historyData = [];
+	var historyId = 0;
+
+	$.getJSON("/history/len", function (res) {
+		if ( res ) {
+			historyLen = res.len;
+			historyId = (historyLen > 30) ? historyLen - 30 : 0;
+			fetchHistory();
+		}
+	});
+
+	function fetchHistory () {
+   		historyId++;
+		$.getJSON("/history/data", {id: historyId}, function (res) {
+			if ( res ) {
+				historyData.push(res);
+				if ( historyId >= historyLen ) {
+					renderData();
+				}
+				else {
+					renderData()
+					fetchHistory();
+				}
+			}
+		});
+	}
+   
+	var chartIndex = 0;
+	function renderData() {
+		var data = {
+			labels: [],
+			datasets: [
+			{
+				label: "Temperature",
+				fillColor: "rgba(151,187,205,0.2)",
+				strokeColor: "rgba(151,187,205,1)",
+				pointColor: "rgba(151,187,205,1)",
+				pointStrokeColor: "#fff",
+				pointHighlightFill: "#fff",
+				pointHighlightStroke: "rgba(151,187,205,1)",
+				data: []
+			}
+		  ]
+		};
+		for ( var i in historyData ) {
+			data.datasets[0].data.push(Number(historyData[i].tmp));
+			data.labels.push(i);
+			chartIndex++;
+		}
+		var ctx = document.getElementById("chart1").getContext("2d");
+		new Chart(ctx).Line(data, {animation: false, showTooltips: true,});
+
+		var data = {
+			labels: [],
+			datasets: [
+			{
+				label: "Humidity",
+				fillColor: "rgba(247,70,74,0.2)",
+				strokeColor: "#F7464A",
+				pointColor: "#F7464A",
+				pointStrokeColor: "#fff",
+				pointHighlightFill: "#fff",
+				pointHighlightStroke: "rgba(0,0,0,1)",
+				data: []
+			}
+		  ]
+		};
+		for ( var i in historyData ) {
+			data.datasets[0].data.push(Number(historyData[i].hum));
+			data.labels.push(i);
+			chartIndex++;
+		}
+		var ctx = document.getElementById("chart2").getContext("2d");
+		new Chart(ctx).Line(data, {animation: false});
+
+		var data = {
+			labels: [],
+			datasets: [
+			{
+				label: "Brightness",
+				fillColor: "rgba(253,180,92,0.2)",
+				strokeColor: "#FDB45C",
+				pointColor: "#FDB45C",
+				pointStrokeColor: "#fff",
+				pointHighlightFill: "#fff",
+				pointHighlightStroke: "rgba(0,0,0,1)",
+				data: []
+			}
+		  ]
+		};
+		for ( var i in historyData ) {
+			data.datasets[0].data.push(Number(historyData[i].lum?historyData[i].lum[0]:0));
+			data.labels.push(i);
+			chartIndex++;
+		}
+		var ctx = document.getElementById("chart3").getContext("2d");
+		new Chart(ctx).Line(data, {animation: false});
+   }
+
+  </script>
+ </body>
+</html>

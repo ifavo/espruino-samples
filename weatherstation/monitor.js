@@ -5,7 +5,7 @@ var deepMerge = require('org.favo.deepmerge').deepmerge;
 /**
  * status object will contain the latest data
  */
-var status = {};
+var status = {data: {}};
 
 /**
  * configuration of the components and intervals
@@ -28,7 +28,10 @@ var config = {
     en: C7,
     irq: C8
   },
-  log: "log-%day.txt"
+  history: {
+    db: require('org.favo.db').connect('history.db'),
+    max: 1000
+  }
 
 };
 
@@ -117,7 +120,16 @@ function handleNrfInput(data) {
   // append data to current status
   status.data = deepMerge(status.data, data);
   status.lastUpdate = getTime();
-  require('fs').appendFile(config.log.replace('%day', Math.ceil(getTime() / 86400)), JSON.stringify(status) + "\n");
+
+  // log to history
+  if ( config.history && config.history.db ) {
+    config.history.db.add(status.data);
+
+    // remove oldest/first entry if max. count is reached
+    if ( config.history.db.len() > config.history.max ) {
+      config.history.db.rem(1);
+    }
+  }
 }
 
 
@@ -163,11 +175,69 @@ function connectWlan() {
  * @param {Object} req
  * @param {Object} res
  */
-function onPageRequest(req, res) { 
-  res.writeHead(200, {"Content-Type": "application/json"});
-  res.end(JSON.stringify(status));
+function onPageRequest(req, res) {
+  var reqParsed = url.parse(req.url, true);
+
+  switch (reqParsed.pathname) {
+
+    // JSON Status output
+    case "/json":
+      res.writeHead(200, {"Content-Type": "application/json"});
+      res.end(JSON.stringify(status));
+      break;
+
+    // forward to index.html 
+    case "/":
+      res.writeHead(200, {"Content-Type": "text/html"});
+      res.end(require('org.favo.template').render(fs.readFileSync('index.html'), status.data));
+      break;
+
+    // get single history entries from the database
+    case "/history/data":
+      res.writeHead(200, {"Content-Type": "application/json"});
+      res.end(JSON.stringify(config.history.db.get(reqParsed.query.id)));
+      break;
+
+    // get number of history entries in the database
+    case "/history/len":
+      res.writeHead(200, {"Content-Type": "application/json"});
+      res.end(JSON.stringify({len: config.history.db.len()}));
+      break;
+
+    // default is to try streaming file contents
+    default:
+      var f = E.openFile(reqParsed.pathname, "r");
+      if (f !== undefined) {
+        res.writeHead(200, {'Content-Type': getMime(reqParsed.pathname)});
+        f.pipe(res); // streams the file to the HTTP response
+      }
+      else { // couldn't open file
+        res.writeHead(404, {'Content-Type': 'text/plain'});
+        res.end("404: Page "+reqParsed.pathname+" not found");
+      }
+      break;
+  }
 }
 
+
+/**
+ * get mime type based on file extension
+ * @param {String} filename
+ * @return {String}
+ */
+function getMime(file) {
+  // get extension
+  var ext = file.split('.').pop();
+  var extList = {
+    css: "text/css",
+    js: "application/javascript",
+    gif: "image/gif",
+    jpg: "image/jpeg",
+    png: "image/png",
+    html: "text/html"
+  };
+  return extList[ext] || 'text/plain';
+}
 
 
 /**
