@@ -16,8 +16,8 @@ var config = {
     ce: B0,
     csn: B1,
     network: {
-      local: [0,0,0,0,2],
-      remote: [0,0,0,0,1]
+      local: [0,0,0,0,3],
+      remote: [0,0,0,0,2]
     }
   },
   cc3000: {
@@ -53,7 +53,10 @@ function initNrf() {
  */
 function receiveNrfData() {
   var dataLine = "";
-  setInterval(function() {
+  var isReadingPipe = false;
+
+  function readDataPipe () {
+    isReadingPipe = true;
     while (nrf.getDataPipe() !== undefined) {
       var data = nrf.getData();
 
@@ -94,7 +97,11 @@ function receiveNrfData() {
         }
       }
     }
-  }, 50);
+
+    isReadingPipe = false;
+  }
+
+  setInterval(readDataPipe, 50);
 }
 
 
