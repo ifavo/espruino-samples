@@ -30,10 +30,13 @@ var config = {
   },
   history: {
     db: require('org.favo.db').connect('history.db'),
-    max: 1000,
-    interval: 5*60*1000
+    max: 60,
+    interval: 5*60*1000,
+    pot: {
+      server: "http://iserve.favo.org:8080",
+      add: "/api/raw/add?packet=:packet"
+    }
   }
-
 };
 
 
@@ -240,13 +243,21 @@ function getMime(file) {
  */
 function historyLog() {
 
-  config.history.db.add(status.data);
+  // save history to database
+  if ( config.history.db ) {
+    config.history.db.add(status.data);
 
-  // remove oldest/first entry if max. count is reached
-  while ( config.history.db.len() > config.history.max ) {
-    config.history.db.rem(1);
+    // remove oldest/first entry if max. count is reached
+    var maxPerRun = 10;
+    while ( config.history.db.len() > config.history.max && --maxPerRun > 0 ) {
+      config.history.db.rem(1);
+    }
   }
 
+  // send data to an espruino pot?
+  if ( config.history.pot ) {
+    require("http").get(config.history.pot.server + config.history.pot.add.replace(':packet', JSON.stringify(status.data)), function () {});
+  }
 }
 
 
