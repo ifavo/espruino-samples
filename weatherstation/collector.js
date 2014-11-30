@@ -6,8 +6,7 @@ var status = {
   ir: {},
   lum: {},
   tmp: 0,
-  hum: 0,
-  lastUpdate: 0
+  hum: 0
 };
 
 /**
@@ -26,8 +25,7 @@ var config = {
       remote: [0,0,0,0,2]
     }
   },
-  interval: 30*1000,
-  log: 'log-%day.txt'
+  interval: 30*1000
 };
 
 
@@ -59,8 +57,7 @@ function updateTemperature(data) {
   }
   status.tmp = data.temp;
   status.hum = data.rh;
-  publishStatus('hum');
-  publishStatus('tmp');
+  publishStatus(['hum', 'tmp']);
   config.power.write(0);
 }
 
@@ -178,12 +175,20 @@ function initNrf() {
  */
 var sendingLimit = 0;
 function publishStatus (part) {
-  status.lastUpdate = Math.ceil(getTime());
   nrf.setEnabled(true);
   var i = 3;
   var sendString;
   if ( part ) {
-    sendString = "{\"" + part + "\":" + JSON.stringify(status[part]) + "}";
+    if ( typeof(part) == 'object' ) {
+      var sendStringParts = [];
+      for ( var j in part ) {
+        sendStringParts.push("\"" + part[j] + "\":" + JSON.stringify(status[part[j]]));
+      }
+      sendString = "{" + sendStringParts.join(',') + "}";
+    }
+    else if ( typeof(part) == 'string' ) {
+      sendString = "{\"" + part + "\":" + JSON.stringify(status[part]) + "}";
+    }
     sendLimit = 3;
   }
   else {
@@ -199,7 +204,6 @@ function publishStatus (part) {
   }
 
   nrf.setEnabled(false);
-  require('fs').appendFile(config.log.replace(Math.ceil(getTime()/86400)), JSON.stringify(status) + "\n");
 }
 
 
