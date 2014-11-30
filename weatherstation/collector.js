@@ -25,7 +25,7 @@ var config = {
       remote: [0,0,0,0,2]
     }
   },
-  interval: 30*1000
+  interval: 10*1000
 };
 
 
@@ -189,7 +189,7 @@ function publishStatus (part) {
     else if ( typeof(part) == 'string' ) {
       sendString = "{\"" + part + "\":" + JSON.stringify(status[part]) + "}";
     }
-    sendLimit = 3;
+    sendingLimit = 3;
   }
   else {
     sendString = JSON.stringify(status);
