@@ -186,7 +186,11 @@ function onPageRequest(req, res) {
     // get single history entries from the database
     case "/history/data":
       res.writeHead(200, {"Content-Type": "application/json"});
-      res.end(JSON.stringify(config.history.db.get(reqParsed.query.id)));
+      var data = config.history.db.get(reqParsed.query.id);
+      if ( !data ) {
+        data = {};
+      }
+      res.end(JSON.stringify(data));
       break;
 
     // get number of history entries in the database
@@ -239,7 +243,7 @@ function historyLog() {
   config.history.db.add(status.data);
 
   // remove oldest/first entry if max. count is reached
-  if ( config.history.db.len() > config.history.max ) {
+  while ( config.history.db.len() > config.history.max ) {
     config.history.db.rem(1);
   }
 
